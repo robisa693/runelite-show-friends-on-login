@@ -2,22 +2,26 @@ package com.robisa693.onlinefriends;
 
 import com.google.inject.Provides;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Friend;
 import net.runelite.api.FriendsChatManager;
 import net.runelite.api.FriendsChatMember;
+import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.GameState;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.EventBus;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 @PluginDescriptor(
     name = "Friends Online",
@@ -26,10 +30,6 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class FriendsOnlinePlugin extends Plugin
 {
-    private static final int INIT_TICKS = 3;
-    private static final int RETRY_TICKS = 4;
-    private static final int MAX_RETRIES = 15;
-
     @Inject
     private Client client;
 
@@ -39,15 +39,13 @@ public class FriendsOnlinePlugin extends Plugin
     @Inject
     private OverlayManager overlayManager;
 
-    @Inject
-    private EventBus eventBus;
-
     private FriendsOnlineOverlay overlay;
-    private EventBus.Subscriber gameStateSubscriber;
-    private EventBus.Subscriber gameTickSubscriber;
-    private int ticksUntilAction = -1;
-    private boolean showing;
-    private int retryCount;
+    private List<String> friendLines = Collections.emptyList();
+    private List<String> clanLines = Collections.emptyList();
+    private List<String> chatLines = Collections.emptyList();
+    private String channelName;
+    private int hideTicks = -1;
+    private boolean shownOnce;
 
     @Provides
     FriendsOnlineConfig getConfig(ConfigManager configManager)
@@ -55,216 +53,263 @@ public class FriendsOnlinePlugin extends Plugin
         return configManager.getConfig(FriendsOnlineConfig.class);
     }
 
+    public List<String> getFriendLines()
+    {
+        return friendLines;
+    }
+
+    public List<String> getClanLines()
+    {
+        return clanLines;
+    }
+
+    public List<String> getChatLines()
+    {
+        return chatLines;
+    }
+
+    public String getChannelName()
+    {
+        return channelName;
+    }
+
     @Override
     protected void startUp()
     {
-        overlay = new FriendsOnlineOverlay();
-        gameStateSubscriber = eventBus.register(GameStateChanged.class, this::onGameStateChanged, 0);
-        gameTickSubscriber = eventBus.register(GameTick.class, this::onGameTick, 0);
+        overlay = new FriendsOnlineOverlay(this);
+        overlay.setVisible(false);
+        overlayManager.add(overlay);
     }
 
     @Override
     protected void shutDown()
     {
-        if (gameStateSubscriber != null)
-        {
-            eventBus.unregister(gameStateSubscriber);
-            gameStateSubscriber = null;
-        }
-        if (gameTickSubscriber != null)
-        {
-            eventBus.unregister(gameTickSubscriber);
-            gameTickSubscriber = null;
-        }
-        hideOverlay();
-        if (overlay != null)
-        {
-            overlayManager.remove(overlay);
-            overlay = null;
-        }
+        overlayManager.remove(overlay);
+        friendLines = Collections.emptyList();
+        clanLines = Collections.emptyList();
+        chatLines = Collections.emptyList();
+        hideTicks = -1;
+        shownOnce = false;
     }
 
+    @Subscribe
     public void onGameStateChanged(GameStateChanged event)
     {
-        if (event.getGameState() == GameState.LOGGED_IN)
+        if (event.getGameState() == GameState.LOGIN_SCREEN)
         {
-            hideOverlay();
-            ticksUntilAction = INIT_TICKS;
-            retryCount = 0;
+            friendLines = Collections.emptyList();
+            clanLines = Collections.emptyList();
+            chatLines = Collections.emptyList();
+            overlay.setVisible(false);
+            hideTicks = -1;
+            shownOnce = false;
         }
     }
 
+    @Subscribe
     public void onGameTick(GameTick event)
     {
-        if (ticksUntilAction < 0)
+        if (client.getGameState() != GameState.LOGGED_IN)
         {
             return;
         }
 
-        ticksUntilAction--;
-
-        if (ticksUntilAction > 0)
+        if (hideTicks > 0)
         {
-            return;
-        }
-
-        if (showing)
-        {
-            hideOverlay();
-            return;
-        }
-
-        attemptShowOverlay();
-    }
-
-    private void attemptShowOverlay()
-    {
-        refreshOverlayData();
-
-        if (overlay.isEmpty())
-        {
-            retryCount++;
-            if (retryCount < MAX_RETRIES)
+            hideTicks--;
+            if (hideTicks == 0)
             {
-                ticksUntilAction = RETRY_TICKS;
-                return;
+                overlay.setVisible(false);
+                friendLines = Collections.emptyList();
+                clanLines = Collections.emptyList();
+                chatLines = Collections.emptyList();
+                hideTicks = -1;
+                shownOnce = false;
             }
-            ticksUntilAction = -1;
             return;
         }
 
-        overlayManager.add(overlay);
-        showing = true;
-
-        int displayTicks = config.displayTime() * 1000 / 600;
-        ticksUntilAction = displayTicks > 0 ? displayTicks : -1;
-    }
-
-    private void refreshOverlayData()
-    {
-        String channelName = null;
-        FriendsChatManager fcm = client.getFriendsChatManager();
-        if (fcm != null)
+        if (shownOnce)
         {
-            channelName = fcm.getName();
+            return;
         }
 
-        List<String> friendLines = buildFriendLines();
-        List<String> clanLines = buildClanLines();
-        List<String> chatLines = buildFriendsChatLines();
+        if (client.getTickCount() % 5 != 0)
+        {
+            return;
+        }
 
-        overlay.setData(friendLines, clanLines, chatLines, channelName);
+        buildData();
+
+        if (hasData())
+        {
+            overlay.setVisible(true);
+            shownOnce = true;
+            if (config.displayTime() > 0)
+            {
+                hideTicks = config.displayTime() * 1000 / 600;
+            }
+        }
     }
 
-    private void hideOverlay()
+    private void buildData()
     {
-        if (overlay != null)
-        {
-            overlay.setVisible(false);
-            overlayManager.remove(overlay);
-        }
-        showing = false;
-        ticksUntilAction = -1;
+        friendLines = buildFriendLines();
+        clanLines = buildClanLines();
+        chatLines = buildChatLines();
+        channelName = buildChannelName();
+    }
+
+    private boolean hasData()
+    {
+        return !friendLines.isEmpty() || !clanLines.isEmpty() || !chatLines.isEmpty();
     }
 
     private List<String> buildFriendLines()
     {
-        List<String> lines = new ArrayList<>();
         if (!config.showFriends())
         {
-            return lines;
+            return Collections.emptyList();
         }
 
-        Friend[] friends = client.getFriendContainer().getMembers();
+        net.runelite.api.FriendContainer container = client.getFriendContainer();
+        if (container == null)
+        {
+            return Collections.emptyList();
+        }
+
+        Friend[] friends = container.getMembers();
         if (friends == null)
         {
-            return lines;
+            return Collections.emptyList();
         }
 
+        List<String> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
+
         for (Friend friend : friends)
         {
             if (friend.getWorld() > 0)
             {
+                String name = Text.toJagexName(friend.getName());
                 if (showWorld)
                 {
-                    lines.add("&&WORLD&&" + friend.getName() + "&&(w" + friend.getWorld() + ")");
+                    lines.add("&&WORLD&&" + name + "&&w" + friend.getWorld());
                 }
                 else
                 {
-                    lines.add(friend.getName());
+                    lines.add(name);
                 }
             }
         }
 
+        lines.sort(null);
         return lines;
     }
 
     private List<String> buildClanLines()
     {
-        List<String> lines = new ArrayList<>();
         if (!config.showClanChat())
         {
-            return lines;
+            return Collections.emptyList();
         }
 
-        ClanChannel clanChannel = client.getClanChannel();
-        if (clanChannel == null)
+        ClanChannel channel = client.getClanChannel();
+        if (channel == null)
         {
-            return lines;
+            return Collections.emptyList();
         }
 
-        List<ClanChannelMember> members = clanChannel.getMembers();
+        List<ClanChannelMember> members = channel.getMembers();
+        if (members == null || members.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+
+        String localName = getLocalPlayerName();
+        List<String> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
 
         for (ClanChannelMember member : members)
         {
+            String name = Text.toJagexName(member.getName());
+            if (name.equals(localName))
+            {
+                continue;
+            }
             if (showWorld)
             {
-                lines.add("&&WORLD&&" + member.getName() + "&&(w" + member.getWorld() + ")");
+                lines.add("&&WORLD&&" + name + "&&w" + member.getWorld());
             }
             else
             {
-                lines.add(member.getName());
+                lines.add(name);
             }
         }
 
+        lines.sort(null);
         return lines;
     }
 
-    private List<String> buildFriendsChatLines()
+    private List<String> buildChatLines()
     {
-        List<String> lines = new ArrayList<>();
         if (!config.showFriendsChat())
         {
-            return lines;
+            return Collections.emptyList();
         }
 
         FriendsChatManager manager = client.getFriendsChatManager();
         if (manager == null)
         {
-            return lines;
+            return Collections.emptyList();
         }
 
         FriendsChatMember[] members = manager.getMembers();
-        if (members == null)
+        if (members == null || members.length == 0)
         {
-            return lines;
+            return Collections.emptyList();
         }
 
+        String localName = getLocalPlayerName();
+        List<String> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
+
         for (FriendsChatMember member : members)
         {
+            String name = Text.toJagexName(member.getName());
+            if (name.equals(localName))
+            {
+                continue;
+            }
             if (showWorld)
             {
-                lines.add("&&WORLD&&" + member.getName() + "&&(w" + member.getWorld() + ")");
+                lines.add("&&WORLD&&" + name + "&&w" + member.getWorld());
             }
             else
             {
-                lines.add(member.getName());
+                lines.add(name);
             }
         }
 
+        lines.sort(null);
         return lines;
+    }
+
+    private String buildChannelName()
+    {
+        FriendsChatManager manager = client.getFriendsChatManager();
+        if (manager == null)
+        {
+            return null;
+        }
+        return manager.getName();
+    }
+
+    private String getLocalPlayerName()
+    {
+        return Optional.ofNullable(client.getLocalPlayer())
+            .map(Player::getName)
+            .map(Text::toJagexName)
+            .orElse(null);
     }
 }
