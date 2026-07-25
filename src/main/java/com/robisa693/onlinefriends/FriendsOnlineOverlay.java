@@ -42,6 +42,13 @@ public class FriendsOnlineOverlay extends Overlay
         this.channelName = channelName;
     }
 
+    public boolean isEmpty()
+    {
+        return (friendLines == null || friendLines.isEmpty())
+            && (clanLines == null || clanLines.isEmpty())
+            && (chatLines == null || chatLines.isEmpty());
+    }
+
     public void setVisible(boolean visible)
     {
         this.visible = visible;

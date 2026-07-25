@@ -26,8 +26,9 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class FriendsOnlinePlugin extends Plugin
 {
-    private static final int DATA_LOAD_TICKS = 15;
-    private static final int MAX_RETRY_TICKS = 50;
+    private static final int INIT_TICKS = 3;
+    private static final int RETRY_TICKS = 4;
+    private static final int MAX_RETRIES = 15;
 
     @Inject
     private Client client;
@@ -46,7 +47,7 @@ public class FriendsOnlinePlugin extends Plugin
     private EventBus.Subscriber gameTickSubscriber;
     private int ticksUntilAction = -1;
     private boolean showing;
-    private int retryTicks;
+    private int retryCount;
 
     @Provides
     FriendsOnlineConfig getConfig(ConfigManager configManager)
@@ -88,9 +89,8 @@ public class FriendsOnlinePlugin extends Plugin
         if (event.getGameState() == GameState.LOGGED_IN)
         {
             hideOverlay();
-            ticksUntilAction = DATA_LOAD_TICKS;
-            retryTicks = 0;
-            showing = false;
+            ticksUntilAction = INIT_TICKS;
+            retryCount = 0;
         }
     }
 
@@ -103,33 +103,44 @@ public class FriendsOnlinePlugin extends Plugin
 
         ticksUntilAction--;
 
-        if (!showing && ticksUntilAction <= 0)
+        if (ticksUntilAction > 0)
         {
-            if (shouldRetry())
-            {
-                retryTicks++;
-                if (retryTicks < MAX_RETRY_TICKS)
-                {
-                    ticksUntilAction = 2;
-                    return;
-                }
-            }
-            showOverlay();
             return;
         }
 
-        if (showing && ticksUntilAction <= 0)
+        if (showing)
         {
             hideOverlay();
+            return;
         }
+
+        attemptShowOverlay();
     }
 
-    private boolean shouldRetry()
+    private void attemptShowOverlay()
     {
-        return config.showClanChat() && client.getClanChannel() == null;
+        refreshOverlayData();
+
+        if (overlay.isEmpty())
+        {
+            retryCount++;
+            if (retryCount < MAX_RETRIES)
+            {
+                ticksUntilAction = RETRY_TICKS;
+                return;
+            }
+            ticksUntilAction = -1;
+            return;
+        }
+
+        overlayManager.add(overlay);
+        showing = true;
+
+        int displayTicks = config.displayTime() * 1000 / 600;
+        ticksUntilAction = displayTicks > 0 ? displayTicks : -1;
     }
 
-    private void showOverlay()
+    private void refreshOverlayData()
     {
         String channelName = null;
         FriendsChatManager fcm = client.getFriendsChatManager();
@@ -142,25 +153,7 @@ public class FriendsOnlinePlugin extends Plugin
         List<String> clanLines = buildClanLines();
         List<String> chatLines = buildFriendsChatLines();
 
-        if (friendLines.isEmpty() && clanLines.isEmpty() && chatLines.isEmpty())
-        {
-            ticksUntilAction = -1;
-            return;
-        }
-
         overlay.setData(friendLines, clanLines, chatLines, channelName);
-        overlay.setVisible(true);
-        overlayManager.add(overlay);
-        showing = true;
-
-        if (config.displayTime() > 0)
-        {
-            ticksUntilAction = (int) (config.displayTime() * 1000f / 600f);
-        }
-        else
-        {
-            ticksUntilAction = -1;
-        }
     }
 
     private void hideOverlay()
