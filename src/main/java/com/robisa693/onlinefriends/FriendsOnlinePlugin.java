@@ -39,8 +39,8 @@ import net.runelite.client.util.Text;
 
 @PluginDescriptor(
     name = "Show Friends On Login",
-    description = "Shows a panel on login with online friends, clan chat members, and chat channel members",
-    tags = {"friends", "online", "clan", "chat", "world", "overlay", "channel"}
+    description = "Shows a panel on login with online friends, clan chat members, and chat channel members, including rank icons",
+    tags = {"friends", "online", "clan", "chat", "world", "rank", "overlay", "channel"}
 )
 public class FriendsOnlinePlugin extends Plugin
 {
