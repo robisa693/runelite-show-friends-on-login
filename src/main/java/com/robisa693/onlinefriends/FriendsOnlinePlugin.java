@@ -21,6 +21,8 @@ import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.clan.ClanRank;
+import net.runelite.api.clan.ClanSettings;
+import net.runelite.api.clan.ClanTitle;
 import net.runelite.api.events.ClanChannelChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -293,9 +295,11 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         ClanChannel channel = client.getClanChannel();
+        ClanSettings settings = client.getClanSettings();
         if (channel == null)
         {
             channel = client.getGuestClanChannel();
+            settings = client.getGuestClanSettings();
         }
         if (channel == null)
         {
@@ -323,9 +327,9 @@ public class FriendsOnlinePlugin extends Plugin
             ClanRank clanRank = member.getRank();
             int rankValue = clanRank.getRank();
             PlayerLine pl = new PlayerLine(cleanName, cleanName, showWorld ? member.getWorld() : -1, rankValue);
-            if (showRanks && rankValue > 0)
+            if (showRanks && rankValue > 0 && settings != null)
             {
-                pl.rankImage = loadClanRankIcon(clanRank);
+                pl.rankImage = loadClanRankIcon(clanRank, settings);
             }
             lines.add(pl);
         }
@@ -387,12 +391,18 @@ public class FriendsOnlinePlugin extends Plugin
             .orElse(null);
     }
 
-    private BufferedImage loadClanRankIcon(ClanRank rank)
+    private BufferedImage loadClanRankIcon(ClanRank rank, ClanSettings clanSettings)
     {
-        int rankValue = rank.getRank();
-        if (clanRankCache.containsKey(rankValue))
+        ClanTitle title = clanSettings.titleForRank(rank);
+        if (title == null)
         {
-            return clanRankCache.get(rankValue);
+            return null;
+        }
+
+        int titleId = title.getId();
+        if (clanRankCache.containsKey(titleId))
+        {
+            return clanRankCache.get(titleId);
         }
 
         BufferedImage img = null;
@@ -401,7 +411,7 @@ public class FriendsOnlinePlugin extends Plugin
             EnumComposition enumComp = client.getEnum(EnumID.CLAN_RANK_GRAPHIC);
             if (enumComp != null)
             {
-                int spriteId = enumComp.getIntValue(rankValue);
+                int spriteId = enumComp.getIntValue(titleId);
                 img = spriteManager.getSprite(spriteId, 0);
             }
         }
@@ -409,7 +419,7 @@ public class FriendsOnlinePlugin extends Plugin
         {
         }
 
-        clanRankCache.put(rankValue, img);
+        clanRankCache.put(titleId, img);
         return img;
     }
 
