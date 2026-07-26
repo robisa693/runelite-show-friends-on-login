@@ -2,6 +2,7 @@ package com.robisa693.onlinefriends;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.util.List;
@@ -15,13 +16,16 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 public class FriendsOnlineOverlay extends OverlayPanel
 {
     private static final int COLUMN_GAP = 15;
+    private static final int MIN_COLUMN_WIDTH = 100;
+    private static final int LEFT_RIGHT_GAP = 10;
+    private static final int HORIZONTAL_PADDING = 12;
 
     private FriendsOnlinePlugin plugin;
     private boolean visible;
 
-    private PanelComponent friendsPanel = new PanelComponent();
-    private PanelComponent clanPanel = new PanelComponent();
-    private PanelComponent chatPanel = new PanelComponent();
+    private final PanelComponent friendsPanel = new PanelComponent();
+    private final PanelComponent clanPanel = new PanelComponent();
+    private final PanelComponent chatPanel = new PanelComponent();
     private boolean populated;
 
     @Inject
@@ -34,6 +38,11 @@ public class FriendsOnlineOverlay extends OverlayPanel
     public void setVisible(boolean visible)
     {
         this.visible = visible;
+
+        if (!visible)
+        {
+            populated = false;
+        }
     }
 
     @Override
@@ -62,6 +71,11 @@ public class FriendsOnlineOverlay extends OverlayPanel
             populatePanel(clanPanel, "Clan Chat", clanLines);
             populatePanel(chatPanel, channelName != null ? channelName : "Chat Channel", chatLines);
             populated = true;
+
+            FontMetrics fm = graphics.getFontMetrics();
+            sizePanelToContent(friendsPanel, fm, "Friends", friendLines);
+            sizePanelToContent(clanPanel, fm, "Clan Chat", clanLines);
+            sizePanelToContent(chatPanel, fm, channelName != null ? channelName : "Chat Channel", chatLines);
 
             Graphics2D warmup = (Graphics2D) graphics.create();
             warmup.setClip(0, 0, 0, 0);
@@ -121,6 +135,30 @@ public class FriendsOnlineOverlay extends OverlayPanel
                 .rightColor(parts[1] != null ? Color.GREEN : null)
                 .build());
         }
+    }
+
+    private static void sizePanelToContent(PanelComponent panel, FontMetrics fm, String title, List<String> lines)
+    {
+        if (lines == null || lines.isEmpty())
+        {
+            return;
+        }
+
+        int maxWidth = fm.stringWidth(title + " (" + lines.size() + "):");
+
+        for (String line : lines)
+        {
+            String[] parts = parseLine(line);
+            int width = fm.stringWidth(parts[0]);
+            if (parts[1] != null)
+            {
+                width += LEFT_RIGHT_GAP + fm.stringWidth(parts[1]);
+            }
+            maxWidth = Math.max(maxWidth, width);
+        }
+
+        int panelWidth = Math.max(MIN_COLUMN_WIDTH, maxWidth + HORIZONTAL_PADDING);
+        panel.setPreferredSize(new Dimension(panelWidth, 0));
     }
 
     private static String[] parseLine(String line)
