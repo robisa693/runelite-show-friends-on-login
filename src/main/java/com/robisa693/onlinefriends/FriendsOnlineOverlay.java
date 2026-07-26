@@ -201,7 +201,12 @@ public class FriendsOnlineOverlay extends OverlayPanel
             int sep = rest.indexOf("&&");
             if (sep >= 0)
             {
-                return new String[]{rest.substring(0, sep), rest.substring(sep + 2)};
+                String world = rest.substring(sep + 2);
+                if (world.startsWith("w") && world.length() > 1)
+                {
+                    world = world.substring(1);
+                }
+                return new String[]{rest.substring(0, sep), world};
             }
             return new String[]{rest, null};
         }

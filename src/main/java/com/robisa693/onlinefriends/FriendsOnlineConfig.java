@@ -60,7 +60,7 @@ public interface FriendsOnlineConfig extends Config
     )
     default int maxPlayers()
     {
-        return 0;
+        return 20;
     }
 
     @ConfigItem(
