@@ -129,6 +129,12 @@ public class FriendsOnlineOverlay extends OverlayPanel
         return null;
     }
 
+    private static int rankIconWidth(PlayerLine line)
+    {
+        if (line.rankImage != null) return line.rankImage.getWidth() + 3;
+        return 0;
+    }
+
     private static void populatePanel(PanelComponent panel, String title, List<PlayerLine> lines, int localWorld)
     {
         panel.getChildren().clear();
@@ -159,11 +165,12 @@ public class FriendsOnlineOverlay extends OverlayPanel
                 worldColor = line.world == localWorld ? Color.GREEN : Color.YELLOW;
             }
 
-            panel.getChildren().add(LineComponent.builder()
-                .left(line.displayName)
-                .right(ws)
-                .rightColor(worldColor)
-                .build());
+            PlayerRowComponent row = new PlayerRowComponent();
+            row.setRankIcon(line.rankImage);
+            row.setName(line.displayName);
+            row.setWorld(ws);
+            row.setWorldColor(worldColor);
+            panel.getChildren().add(row);
         }
     }
 
@@ -178,7 +185,7 @@ public class FriendsOnlineOverlay extends OverlayPanel
 
         for (PlayerLine line : lines)
         {
-            int width = fm.stringWidth(line.displayName);
+            int width = rankIconWidth(line) + fm.stringWidth(line.displayName);
             String ws = worldString(line);
             if (ws != null)
             {

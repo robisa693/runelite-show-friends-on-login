@@ -1,5 +1,7 @@
 package com.robisa693.onlinefriends;
 
+import java.awt.image.BufferedImage;
+
 class PlayerLine
 {
     final String displayName;
@@ -7,6 +9,7 @@ class PlayerLine
     final int world;
     final int rank;
     final boolean moreLine;
+    BufferedImage rankImage;
 
     PlayerLine(String displayName, String sortName, int world, int rank)
     {

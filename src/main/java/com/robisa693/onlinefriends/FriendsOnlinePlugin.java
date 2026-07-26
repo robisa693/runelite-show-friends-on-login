@@ -1,19 +1,26 @@
 package com.robisa693.onlinefriends;
 
 import com.google.inject.Provides;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.Friend;
 import net.runelite.api.FriendsChatManager;
 import net.runelite.api.FriendsChatMember;
+import net.runelite.api.FriendsChatRank;
 import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
+import net.runelite.api.clan.ClanRank;
 import net.runelite.api.events.ClanChannelChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -21,6 +28,8 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.api.GameState;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ChatIconManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -42,6 +51,12 @@ public class FriendsOnlinePlugin extends Plugin
     @Inject
     private OverlayManager overlayManager;
 
+    @Inject
+    private ChatIconManager chatIconManager;
+
+    @Inject
+    private SpriteManager spriteManager;
+
     private FriendsOnlineOverlay overlay;
     private List<PlayerLine> friendLines = Collections.emptyList();
     private List<PlayerLine> clanLines = Collections.emptyList();
@@ -50,7 +65,8 @@ public class FriendsOnlinePlugin extends Plugin
     private boolean shownOnce;
     private int dataRetries;
 
-    private static final String[] RANK_SYMBOLS = {"", "\u25CB", "\u25CF", "\u25C7", "\u25A1", "\u2606", "\u2605", "\u2726", "\u265B", "\u265A", "\u2694", "\u2720"};
+    private final Map<Integer, BufferedImage> clanRankCache = new HashMap<>();
+    private final Map<Integer, BufferedImage> chatRankCache = new HashMap<>();
 
     @Provides
     FriendsOnlineConfig getConfig(ConfigManager configManager)
@@ -111,6 +127,8 @@ public class FriendsOnlinePlugin extends Plugin
         hideTicks = -1;
         shownOnce = false;
         dataRetries = 0;
+        clanRankCache.clear();
+        chatRankCache.clear();
     }
 
     @Subscribe
@@ -253,15 +271,13 @@ public class FriendsOnlinePlugin extends Plugin
 
         List<PlayerLine> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
-        boolean showRanks = config.showRanks();
 
         for (Friend friend : friends)
         {
             if (friend.getWorld() > 0)
             {
                 String cleanName = Text.toJagexName(friend.getName());
-                String displayName = cleanName;
-                lines.add(new PlayerLine(displayName, cleanName, showWorld ? friend.getWorld() : -1, -1));
+                lines.add(new PlayerLine(cleanName, cleanName, showWorld ? friend.getWorld() : -1, -1));
             }
         }
 
@@ -304,9 +320,14 @@ public class FriendsOnlinePlugin extends Plugin
             {
                 continue;
             }
-            int rankOrdinal = member.getRank().getRank();
-            String displayName = showRanks ? rankSymbol(rankOrdinal) + cleanName : cleanName;
-            lines.add(new PlayerLine(displayName, cleanName, showWorld ? member.getWorld() : -1, rankOrdinal));
+            ClanRank clanRank = member.getRank();
+            int rankValue = clanRank.getRank();
+            PlayerLine pl = new PlayerLine(cleanName, cleanName, showWorld ? member.getWorld() : -1, rankValue);
+            if (showRanks && rankValue > 0)
+            {
+                pl.rankImage = loadClanRankIcon(clanRank);
+            }
+            lines.add(pl);
         }
 
         sortLines(lines);
@@ -344,9 +365,14 @@ public class FriendsOnlinePlugin extends Plugin
             {
                 continue;
             }
-            int rankOrdinal = member.getRank().getValue();
-            String displayName = showRanks ? rankSymbol(rankOrdinal) + cleanName : cleanName;
-            lines.add(new PlayerLine(displayName, cleanName, showWorld ? member.getWorld() : -1, rankOrdinal));
+            FriendsChatRank rank = member.getRank();
+            int rankValue = rank.getValue();
+            PlayerLine pl = new PlayerLine(cleanName, cleanName, showWorld ? member.getWorld() : -1, rankValue);
+            if (showRanks && rankValue > 0)
+            {
+                pl.rankImage = loadFriendsChatRankIcon(rank);
+            }
+            lines.add(pl);
         }
 
         sortLines(lines);
@@ -361,16 +387,91 @@ public class FriendsOnlinePlugin extends Plugin
             .orElse(null);
     }
 
-    private static String rankSymbol(int ordinal)
+    private BufferedImage loadClanRankIcon(ClanRank rank)
     {
-        if (ordinal <= 0) return "";
-        int idx = Math.min(ordinal, RANK_SYMBOLS.length - 1);
-        return RANK_SYMBOLS[idx] + " ";
+        int rankValue = rank.getRank();
+        if (clanRankCache.containsKey(rankValue))
+        {
+            return clanRankCache.get(rankValue);
+        }
+
+        BufferedImage img = null;
+        try
+        {
+            EnumComposition enumComp = client.getEnum(EnumID.CLAN_RANK_GRAPHIC);
+            if (enumComp != null)
+            {
+                int spriteId = enumComp.getIntValue(rankValue);
+                img = spriteManager.getSprite(spriteId, 0);
+            }
+        }
+        catch (Exception e)
+        {
+        }
+
+        clanRankCache.put(rankValue, img);
+        return img;
+    }
+
+    private BufferedImage loadFriendsChatRankIcon(FriendsChatRank rank)
+    {
+        int rankValue = rank.getValue();
+        if (chatRankCache.containsKey(rankValue))
+        {
+            return chatRankCache.get(rankValue);
+        }
+
+        BufferedImage img = null;
+        try
+        {
+            img = chatIconManager.getRankImage(rank);
+        }
+        catch (Exception e)
+        {
+        }
+
+        chatRankCache.put(rankValue, img);
+        return img;
     }
 
     private void sortLines(List<PlayerLine> lines)
     {
         FriendsOnlineConfig.SortMode mode = config.sortMode();
+
+        if (mode == FriendsOnlineConfig.SortMode.WORLD)
+        {
+            Map<Integer, Integer> worldCounts = new HashMap<>();
+            for (PlayerLine pl : lines)
+            {
+                if (!pl.moreLine && pl.world > 0)
+                {
+                    worldCounts.merge(pl.world, 1, Integer::sum);
+                }
+            }
+
+            lines.sort((a, b) ->
+            {
+                if (a.moreLine) return 1;
+                if (b.moreLine) return -1;
+
+                boolean aHasWorld = a.world > 0;
+                boolean bHasWorld = b.world > 0;
+                if (aHasWorld != bHasWorld) return aHasWorld ? -1 : 1;
+
+                if (aHasWorld)
+                {
+                    int cmp = Integer.compare(
+                        worldCounts.getOrDefault(b.world, 0),
+                        worldCounts.getOrDefault(a.world, 0));
+                    if (cmp != 0) return cmp;
+                    if (a.world != b.world) return Integer.compare(a.world, b.world);
+                }
+
+                return a.sortName.compareToIgnoreCase(b.sortName);
+            });
+            return;
+        }
+
         Comparator<PlayerLine> c;
 
         if (mode == FriendsOnlineConfig.SortMode.RANK)

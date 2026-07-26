@@ -133,6 +133,7 @@ public interface FriendsOnlineConfig extends Config
     enum SortMode
     {
         ALPHABETICAL,
-        RANK
+        RANK,
+        WORLD
     }
 }
