@@ -29,7 +29,7 @@ public interface FriendsOnlineConfig extends Config
     @ConfigItem(
         keyName = "displayTime",
         name = "Display Time",
-        description = "How many seconds the infobox stays visible before disappearing (0 = always visible)",
+        description = "How many seconds the overlay stays visible before hiding (0 = never hide)",
         section = displaySection,
         position = 0
     )
