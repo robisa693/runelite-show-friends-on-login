@@ -141,6 +141,16 @@ public class FriendsOnlinePlugin extends Plugin
 
         buildData();
         overlay.invalidateData();
+
+        if (config.displayTime() == 0 && hasData())
+        {
+            overlay.setVisible(true);
+            hideTicks = -1;
+        }
+        else if (overlay.isVisible())
+        {
+            hideTicks = config.displayTime() * 1000 / 600;
+        }
     }
 
     @Subscribe
