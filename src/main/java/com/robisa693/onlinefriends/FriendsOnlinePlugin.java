@@ -124,7 +124,6 @@ public class FriendsOnlinePlugin extends Plugin
                 clanLines = Collections.emptyList();
                 chatLines = Collections.emptyList();
                 hideTicks = -1;
-                shownOnce = false;
             }
             return;
         }
