@@ -216,6 +216,10 @@ public class FriendsOnlinePlugin extends Plugin
         ClanChannel channel = client.getClanChannel();
         if (channel == null)
         {
+            channel = client.getGuestClanChannel();
+        }
+        if (channel == null)
+        {
             return Collections.emptyList();
         }
 
