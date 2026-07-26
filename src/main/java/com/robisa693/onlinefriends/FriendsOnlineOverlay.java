@@ -77,9 +77,10 @@ public class FriendsOnlineOverlay extends OverlayPanel
 
         if (!populated)
         {
-            populatePanel(friendsPanel, "Friends", friendLines);
-            populatePanel(clanPanel, "Clan Chat", clanLines);
-            populatePanel(chatPanel, channelName != null ? channelName : "Chat Channel", chatLines);
+            int localWorld = plugin.getLocalWorld();
+            populatePanel(friendsPanel, "Friends", friendLines, localWorld);
+            populatePanel(clanPanel, "Clan Chat", clanLines, localWorld);
+            populatePanel(chatPanel, channelName != null ? channelName : "Chat Channel", chatLines, localWorld);
             populated = true;
 
             FontMetrics fm = graphics.getFontMetrics();
@@ -123,7 +124,7 @@ public class FriendsOnlineOverlay extends OverlayPanel
         return new Dimension(x - COLUMN_GAP, totalHeight);
     }
 
-    private static void populatePanel(PanelComponent panel, String title, List<String> lines)
+    private static void populatePanel(PanelComponent panel, String title, List<String> lines, int localWorld)
     {
         panel.getChildren().clear();
 
@@ -138,11 +139,32 @@ public class FriendsOnlineOverlay extends OverlayPanel
 
         for (String line : lines)
         {
+            if (line.startsWith("+") && line.endsWith(" more"))
+            {
+                panel.getChildren().add(LineComponent.builder()
+                    .left(line)
+                    .build());
+                continue;
+            }
+
             String[] parts = parseLine(line);
+            Color worldColor = null;
+            if (parts[1] != null)
+            {
+                try
+                {
+                    int w = Integer.parseInt(parts[1]);
+                    worldColor = w == localWorld ? Color.GREEN : Color.YELLOW;
+                }
+                catch (NumberFormatException e)
+                {
+                    worldColor = Color.GREEN;
+                }
+            }
             panel.getChildren().add(LineComponent.builder()
                 .left(parts[0])
                 .right(parts[1])
-                .rightColor(parts[1] != null ? Color.GREEN : null)
+                .rightColor(worldColor)
                 .build());
         }
     }

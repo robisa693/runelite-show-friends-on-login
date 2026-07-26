@@ -50,6 +50,19 @@ public interface FriendsOnlineConfig extends Config
         return true;
     }
 
+    @Range(min = 0, max = 100)
+    @ConfigItem(
+        keyName = "maxPlayers",
+        name = "Max Players",
+        description = "Maximum number of players to show per category (0 = no limit)",
+        section = displaySection,
+        position = 2
+    )
+    default int maxPlayers()
+    {
+        return 0;
+    }
+
     @ConfigItem(
         keyName = "showFriends",
         name = "Show Friends",

@@ -74,6 +74,11 @@ public class FriendsOnlinePlugin extends Plugin
         return channelName;
     }
 
+    public int getLocalWorld()
+    {
+        return client.getWorld();
+    }
+
     @Override
     protected void startUp()
     {
@@ -220,7 +225,7 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         lines.sort(null);
-        return lines;
+        return trimLines(lines);
     }
 
     private List<String> buildClanLines()
@@ -268,7 +273,7 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         lines.sort(null);
-        return lines;
+        return trimLines(lines);
     }
 
     private List<String> buildChatLines()
@@ -312,7 +317,7 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         lines.sort(null);
-        return lines;
+        return trimLines(lines);
     }
 
     private String buildChannelName()
@@ -331,5 +336,17 @@ public class FriendsOnlinePlugin extends Plugin
             .map(Player::getName)
             .map(Text::toJagexName)
             .orElse(null);
+    }
+
+    private List<String> trimLines(List<String> lines)
+    {
+        int max = config.maxPlayers();
+        if (max > 0 && lines.size() > max)
+        {
+            int remaining = lines.size() - max;
+            lines = new ArrayList<>(lines.subList(0, max));
+            lines.add("+" + remaining + " more");
+        }
+        return lines;
     }
 }
