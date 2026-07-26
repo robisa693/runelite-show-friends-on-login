@@ -54,7 +54,6 @@ public class FriendsOnlineOverlay extends OverlayPanel
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        System.out.println("[FriendsOnline] render visible=" + visible + " populated=" + populated + " friends=" + (plugin.getFriendLines() != null ? plugin.getFriendLines().size() : -1) + " clan=" + (plugin.getClanLines() != null ? plugin.getClanLines().size() : -1) + " chat=" + (plugin.getChatLines() != null ? plugin.getChatLines().size() : -1) + " sortMode=" + plugin.getSortMode() + " showRanks=" + plugin.getShowRanks());
         if (!visible)
         {
             return null;
@@ -141,8 +140,9 @@ public class FriendsOnlineOverlay extends OverlayPanel
             return;
         }
 
+        long actualCount = lines.stream().filter(l -> !l.moreLine).count();
         panel.getChildren().add(TitleComponent.builder()
-            .text(title + " (" + lines.size() + "):")
+            .text(title + " (" + actualCount + "):")
             .build());
 
         for (PlayerLine line : lines)
@@ -178,7 +178,8 @@ public class FriendsOnlineOverlay extends OverlayPanel
             return;
         }
 
-        int maxWidth = fm.stringWidth(title + " (" + lines.size() + "):");
+        long actualCount = lines.stream().filter(l -> !l.moreLine).count();
+        int maxWidth = fm.stringWidth(title + " (" + actualCount + "):");
 
         for (PlayerLine line : lines)
         {

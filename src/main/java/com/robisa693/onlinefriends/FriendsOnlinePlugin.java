@@ -67,7 +67,7 @@ public class FriendsOnlinePlugin extends Plugin
     private boolean shownOnce;
     private int dataRetries;
 
-    private final Map<Integer, BufferedImage> clanRankCache = new HashMap<>();
+    private final Map<ClanRank, BufferedImage> clanRankCache = new HashMap<>();
     private final Map<Integer, BufferedImage> chatRankCache = new HashMap<>();
 
     @Provides
@@ -172,9 +172,14 @@ public class FriendsOnlinePlugin extends Plugin
             return;
         }
 
-        System.out.println("[FriendsOnline] onConfigChanged key=" + event.getKey() + " old=" + event.getOldValue() + " new=" + event.getNewValue());
+        try
+        {
+            buildData();
+        }
+        catch (Exception | Error e)
+        {
+        }
 
-        buildData();
         overlay.invalidateData();
 
         if (hasData())
@@ -183,7 +188,6 @@ public class FriendsOnlinePlugin extends Plugin
             hideTicks = config.displayTime() > 0
                 ? config.displayTime() * 1000 / 600
                 : -1;
-            System.out.println("[FriendsOnline] onConfigChanged: overlay shown, hideTicks=" + hideTicks + " displayTime=" + config.displayTime());
         }
     }
 
@@ -394,34 +398,47 @@ public class FriendsOnlinePlugin extends Plugin
 
     private BufferedImage loadClanRankIcon(ClanRank rank, ClanSettings clanSettings)
     {
-        ClanTitle title = clanSettings.titleForRank(rank);
-        if (title == null)
+        if (rank == null)
         {
             return null;
         }
 
-        int titleId = title.getId();
-        if (clanRankCache.containsKey(titleId))
+        if (clanRankCache.containsKey(rank))
         {
-            return clanRankCache.get(titleId);
+            return clanRankCache.get(rank);
         }
 
-        BufferedImage img = null;
         try
         {
-            EnumComposition enumComp = client.getEnum(EnumID.CLAN_RANK_GRAPHIC);
-            if (enumComp != null)
+            ClanTitle title = clanSettings.titleForRank(rank);
+            if (title == null)
             {
-                int spriteId = enumComp.getIntValue(titleId);
-                img = spriteManager.getSprite(spriteId, 0);
+                clanRankCache.put(rank, null);
+                return null;
             }
-        }
-        catch (Exception e)
-        {
-        }
 
-        clanRankCache.put(titleId, img);
-        return img;
+            BufferedImage img = null;
+            try
+            {
+                EnumComposition enumComp = client.getEnum(EnumID.CLAN_RANK_GRAPHIC);
+                if (enumComp != null)
+                {
+                    int spriteId = enumComp.getIntValue(title.getId());
+                    img = spriteManager.getSprite(spriteId, 0);
+                }
+            }
+            catch (Exception e)
+            {
+            }
+
+            clanRankCache.put(rank, img);
+            return img;
+        }
+        catch (Error | Exception e)
+        {
+            clanRankCache.put(rank, null);
+            return null;
+        }
     }
 
     private BufferedImage loadFriendsChatRankIcon(FriendsChatRank rank)
