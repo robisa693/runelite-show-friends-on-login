@@ -14,7 +14,6 @@ import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.ClanChannelChanged;
-import net.runelite.api.events.FriendsChatChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.events.ConfigChanged;
@@ -27,7 +26,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Text;
 
 @PluginDescriptor(
-    name = "Friends Online",
+    name = "Show Friends On Login",
     description = "Shows a panel on login with online friends, clan chat members, and chat channel members",
     tags = {"friends", "online", "clan", "chat", "world", "overlay", "channel"}
 )
@@ -46,9 +45,9 @@ public class FriendsOnlinePlugin extends Plugin
     private List<String> friendLines = Collections.emptyList();
     private List<String> clanLines = Collections.emptyList();
     private List<String> chatLines = Collections.emptyList();
-    private String channelName;
     private int hideTicks = -1;
     private boolean shownOnce;
+    private int dataRetries;
 
     @Provides
     FriendsOnlineConfig getConfig(ConfigManager configManager)
@@ -73,7 +72,7 @@ public class FriendsOnlinePlugin extends Plugin
 
     public String getChannelName()
     {
-        return channelName;
+        return "Chat-channel";
     }
 
     public int getLocalWorld()
@@ -98,6 +97,7 @@ public class FriendsOnlinePlugin extends Plugin
         chatLines = Collections.emptyList();
         hideTicks = -1;
         shownOnce = false;
+        dataRetries = 0;
     }
 
     @Subscribe
@@ -111,6 +111,7 @@ public class FriendsOnlinePlugin extends Plugin
             overlay.setVisible(false);
             hideTicks = -1;
             shownOnce = false;
+            dataRetries = 0;
         }
     }
 
@@ -143,23 +144,6 @@ public class FriendsOnlinePlugin extends Plugin
     }
 
     @Subscribe
-    public void onFriendsChatChanged(FriendsChatChanged event)
-    {
-        if (!event.isJoined())
-        {
-            return;
-        }
-
-        chatLines = buildChatLines();
-        channelName = buildChannelName();
-
-        if (overlay.isVisible())
-        {
-            overlay.invalidateData();
-        }
-    }
-
-    @Subscribe
     public void onGameTick(GameTick event)
     {
         if (client.getGameState() != GameState.LOGGED_IN)
@@ -181,7 +165,7 @@ public class FriendsOnlinePlugin extends Plugin
             return;
         }
 
-        if (shownOnce)
+        if (dataRetries > 10)
         {
             return;
         }
@@ -191,15 +175,24 @@ public class FriendsOnlinePlugin extends Plugin
             return;
         }
 
+        dataRetries++;
+
         buildData();
 
         if (hasData())
         {
-            overlay.setVisible(true);
-            shownOnce = true;
-            if (config.displayTime() > 0)
+            if (!shownOnce)
             {
-                hideTicks = config.displayTime() * 1000 / 600;
+                overlay.setVisible(true);
+                shownOnce = true;
+                if (config.displayTime() > 0)
+                {
+                    hideTicks = config.displayTime() * 1000 / 600;
+                }
+            }
+            else
+            {
+                overlay.invalidateData();
             }
         }
     }
@@ -209,7 +202,6 @@ public class FriendsOnlinePlugin extends Plugin
         friendLines = buildFriendLines();
         clanLines = buildClanLines();
         chatLines = buildChatLines();
-        channelName = buildChannelName();
     }
 
     private boolean hasData()
@@ -349,16 +341,6 @@ public class FriendsOnlinePlugin extends Plugin
 
         lines.sort(null);
         return trimLines(lines);
-    }
-
-    private String buildChannelName()
-    {
-        FriendsChatManager manager = client.getFriendsChatManager();
-        if (manager == null)
-        {
-            return null;
-        }
-        return manager.getName();
     }
 
     private String getLocalPlayerName()

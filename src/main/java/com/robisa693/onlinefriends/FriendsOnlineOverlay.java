@@ -66,7 +66,6 @@ public class FriendsOnlineOverlay extends OverlayPanel
         List<String> friendLines = plugin.getFriendLines();
         List<String> clanLines = plugin.getClanLines();
         List<String> chatLines = plugin.getChatLines();
-        String channelName = plugin.getChannelName();
 
         if ((friendLines == null || friendLines.isEmpty())
             && (clanLines == null || clanLines.isEmpty())
@@ -80,13 +79,13 @@ public class FriendsOnlineOverlay extends OverlayPanel
             int localWorld = plugin.getLocalWorld();
             populatePanel(friendsPanel, "Friends", friendLines, localWorld);
             populatePanel(clanPanel, "Clan Chat", clanLines, localWorld);
-            populatePanel(chatPanel, channelName != null ? channelName : "Chat Channel", chatLines, localWorld);
+            populatePanel(chatPanel, "Chat-channel", chatLines, localWorld);
             populated = true;
 
             FontMetrics fm = graphics.getFontMetrics();
             sizePanelToContent(friendsPanel, fm, "Friends", friendLines);
             sizePanelToContent(clanPanel, fm, "Clan Chat", clanLines);
-            sizePanelToContent(chatPanel, fm, channelName != null ? channelName : "Chat Channel", chatLines);
+            sizePanelToContent(chatPanel, fm, "Chat-channel", chatLines);
 
             Graphics2D warmup = (Graphics2D) graphics.create();
             warmup.setClip(0, 0, 0, 0);
