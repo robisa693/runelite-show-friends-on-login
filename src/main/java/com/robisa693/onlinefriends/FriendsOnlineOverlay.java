@@ -38,11 +38,7 @@ public class FriendsOnlineOverlay extends OverlayPanel
     public void setVisible(boolean visible)
     {
         this.visible = visible;
-
-        if (!visible)
-        {
-            populated = false;
-        }
+        populated = false;
     }
 
     public boolean isVisible()
@@ -58,6 +54,7 @@ public class FriendsOnlineOverlay extends OverlayPanel
     @Override
     public Dimension render(Graphics2D graphics)
     {
+        System.out.println("[FriendsOnline] render visible=" + visible + " populated=" + populated + " friends=" + (plugin.getFriendLines() != null ? plugin.getFriendLines().size() : -1) + " clan=" + (plugin.getClanLines() != null ? plugin.getClanLines().size() : -1) + " chat=" + (plugin.getChatLines() != null ? plugin.getChatLines().size() : -1) + " sortMode=" + plugin.getSortMode() + " showRanks=" + plugin.getShowRanks());
         if (!visible)
         {
             return null;

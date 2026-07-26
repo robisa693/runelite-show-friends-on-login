@@ -172,6 +172,8 @@ public class FriendsOnlinePlugin extends Plugin
             return;
         }
 
+        System.out.println("[FriendsOnline] onConfigChanged key=" + event.getKey() + " old=" + event.getOldValue() + " new=" + event.getNewValue());
+
         buildData();
         overlay.invalidateData();
 
@@ -181,6 +183,7 @@ public class FriendsOnlinePlugin extends Plugin
             hideTicks = config.displayTime() > 0
                 ? config.displayTime() * 1000 / 600
                 : -1;
+            System.out.println("[FriendsOnline] onConfigChanged: overlay shown, hideTicks=" + hideTicks + " displayTime=" + config.displayTime());
         }
     }
 
