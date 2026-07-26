@@ -63,9 +63,9 @@ public class FriendsOnlineOverlay extends OverlayPanel
             return null;
         }
 
-        List<String> friendLines = plugin.getFriendLines();
-        List<String> clanLines = plugin.getClanLines();
-        List<String> chatLines = plugin.getChatLines();
+        List<PlayerLine> friendLines = plugin.getFriendLines();
+        List<PlayerLine> clanLines = plugin.getClanLines();
+        List<PlayerLine> chatLines = plugin.getChatLines();
 
         if ((friendLines == null || friendLines.isEmpty())
             && (clanLines == null || clanLines.isEmpty())
@@ -123,7 +123,13 @@ public class FriendsOnlineOverlay extends OverlayPanel
         return new Dimension(x - COLUMN_GAP, totalHeight);
     }
 
-    private static void populatePanel(PanelComponent panel, String title, List<String> lines, int localWorld)
+    private static String worldString(PlayerLine line)
+    {
+        if (line.world > 0) return Integer.toString(line.world);
+        return null;
+    }
+
+    private static void populatePanel(PanelComponent panel, String title, List<PlayerLine> lines, int localWorld)
     {
         panel.getChildren().clear();
 
@@ -136,39 +142,32 @@ public class FriendsOnlineOverlay extends OverlayPanel
             .text(title + " (" + lines.size() + "):")
             .build());
 
-        for (String line : lines)
+        for (PlayerLine line : lines)
         {
-            if (line.startsWith("+") && line.endsWith(" more"))
+            if (line.moreLine)
             {
                 panel.getChildren().add(LineComponent.builder()
-                    .left(line)
+                    .left(line.displayName)
                     .build());
                 continue;
             }
 
-            String[] parts = parseLine(line);
             Color worldColor = null;
-            if (parts[1] != null)
+            String ws = worldString(line);
+            if (ws != null)
             {
-                try
-                {
-                    int w = Integer.parseInt(parts[1]);
-                    worldColor = w == localWorld ? Color.GREEN : Color.YELLOW;
-                }
-                catch (NumberFormatException e)
-                {
-                    worldColor = Color.GREEN;
-                }
+                worldColor = line.world == localWorld ? Color.GREEN : Color.YELLOW;
             }
+
             panel.getChildren().add(LineComponent.builder()
-                .left(parts[0])
-                .right(parts[1])
+                .left(line.displayName)
+                .right(ws)
                 .rightColor(worldColor)
                 .build());
         }
     }
 
-    private static void sizePanelToContent(PanelComponent panel, FontMetrics fm, String title, List<String> lines)
+    private static void sizePanelToContent(PanelComponent panel, FontMetrics fm, String title, List<PlayerLine> lines)
     {
         if (lines == null || lines.isEmpty())
         {
@@ -177,38 +176,18 @@ public class FriendsOnlineOverlay extends OverlayPanel
 
         int maxWidth = fm.stringWidth(title + " (" + lines.size() + "):");
 
-        for (String line : lines)
+        for (PlayerLine line : lines)
         {
-            String[] parts = parseLine(line);
-            int width = fm.stringWidth(parts[0]);
-            if (parts[1] != null)
+            int width = fm.stringWidth(line.displayName);
+            String ws = worldString(line);
+            if (ws != null)
             {
-                width += LEFT_RIGHT_GAP + fm.stringWidth(parts[1]);
+                width += LEFT_RIGHT_GAP + fm.stringWidth(ws);
             }
             maxWidth = Math.max(maxWidth, width);
         }
 
         int panelWidth = Math.max(MIN_COLUMN_WIDTH, maxWidth + HORIZONTAL_PADDING);
         panel.setPreferredSize(new Dimension(panelWidth, 0));
-    }
-
-    private static String[] parseLine(String line)
-    {
-        if (line.startsWith("&&WORLD&&"))
-        {
-            String rest = line.substring(9);
-            int sep = rest.indexOf("&&");
-            if (sep >= 0)
-            {
-                String world = rest.substring(sep + 2);
-                if (world.startsWith("w") && world.length() > 1)
-                {
-                    world = world.substring(1);
-                }
-                return new String[]{rest.substring(0, sep), world};
-            }
-            return new String[]{rest, null};
-        }
-        return new String[]{line, null};
     }
 }

@@ -3,6 +3,7 @@ package com.robisa693.onlinefriends;
 import com.google.inject.Provides;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -42,12 +43,14 @@ public class FriendsOnlinePlugin extends Plugin
     private OverlayManager overlayManager;
 
     private FriendsOnlineOverlay overlay;
-    private List<String> friendLines = Collections.emptyList();
-    private List<String> clanLines = Collections.emptyList();
-    private List<String> chatLines = Collections.emptyList();
+    private List<PlayerLine> friendLines = Collections.emptyList();
+    private List<PlayerLine> clanLines = Collections.emptyList();
+    private List<PlayerLine> chatLines = Collections.emptyList();
     private int hideTicks = -1;
     private boolean shownOnce;
     private int dataRetries;
+
+    private static final String[] RANK_SYMBOLS = {"", "\u25CB", "\u25CF", "\u25C7", "\u25A1", "\u2606", "\u2605", "\u2726", "\u265B", "\u265A", "\u2694", "\u2720"};
 
     @Provides
     FriendsOnlineConfig getConfig(ConfigManager configManager)
@@ -55,17 +58,17 @@ public class FriendsOnlinePlugin extends Plugin
         return configManager.getConfig(FriendsOnlineConfig.class);
     }
 
-    public List<String> getFriendLines()
+    public List<PlayerLine> getFriendLines()
     {
         return friendLines;
     }
 
-    public List<String> getClanLines()
+    public List<PlayerLine> getClanLines()
     {
         return clanLines;
     }
 
-    public List<String> getChatLines()
+    public List<PlayerLine> getChatLines()
     {
         return chatLines;
     }
@@ -78,6 +81,16 @@ public class FriendsOnlinePlugin extends Plugin
     public int getLocalWorld()
     {
         return client.getWorld();
+    }
+
+    public boolean getShowRanks()
+    {
+        return config.showRanks();
+    }
+
+    public FriendsOnlineConfig.SortMode getSortMode()
+    {
+        return config.sortMode();
     }
 
     @Override
@@ -219,7 +232,7 @@ public class FriendsOnlinePlugin extends Plugin
         return !friendLines.isEmpty() || !clanLines.isEmpty() || !chatLines.isEmpty();
     }
 
-    private List<String> buildFriendLines()
+    private List<PlayerLine> buildFriendLines()
     {
         if (!config.showFriends())
         {
@@ -238,30 +251,25 @@ public class FriendsOnlinePlugin extends Plugin
             return Collections.emptyList();
         }
 
-        List<String> lines = new ArrayList<>();
+        List<PlayerLine> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
+        boolean showRanks = config.showRanks();
 
         for (Friend friend : friends)
         {
             if (friend.getWorld() > 0)
             {
-                String name = Text.toJagexName(friend.getName());
-                if (showWorld)
-                {
-                    lines.add("&&WORLD&&" + name + "&&w" + friend.getWorld());
-                }
-                else
-                {
-                    lines.add(name);
-                }
+                String cleanName = Text.toJagexName(friend.getName());
+                String displayName = cleanName;
+                lines.add(new PlayerLine(displayName, cleanName, showWorld ? friend.getWorld() : -1, -1));
             }
         }
 
-        lines.sort(null);
+        sortLines(lines);
         return trimLines(lines);
     }
 
-    private List<String> buildClanLines()
+    private List<PlayerLine> buildClanLines()
     {
         if (!config.showClanChat())
         {
@@ -285,31 +293,27 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         String localName = getLocalPlayerName();
-        List<String> lines = new ArrayList<>();
+        List<PlayerLine> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
+        boolean showRanks = config.showRanks();
 
         for (ClanChannelMember member : members)
         {
-            String name = Text.toJagexName(member.getName());
-            if (name.equals(localName))
+            String cleanName = Text.toJagexName(member.getName());
+            if (cleanName.equals(localName))
             {
                 continue;
             }
-            if (showWorld)
-            {
-                lines.add("&&WORLD&&" + name + "&&w" + member.getWorld());
-            }
-            else
-            {
-                lines.add(name);
-            }
+            int rankOrdinal = member.getRank().getRank();
+            String displayName = showRanks ? rankSymbol(rankOrdinal) + cleanName : cleanName;
+            lines.add(new PlayerLine(displayName, cleanName, showWorld ? member.getWorld() : -1, rankOrdinal));
         }
 
-        lines.sort(null);
+        sortLines(lines);
         return trimLines(lines);
     }
 
-    private List<String> buildChatLines()
+    private List<PlayerLine> buildChatLines()
     {
         if (!config.showFriendsChat())
         {
@@ -329,27 +333,23 @@ public class FriendsOnlinePlugin extends Plugin
         }
 
         String localName = getLocalPlayerName();
-        List<String> lines = new ArrayList<>();
+        List<PlayerLine> lines = new ArrayList<>();
         boolean showWorld = config.showWorld();
+        boolean showRanks = config.showRanks();
 
         for (FriendsChatMember member : members)
         {
-            String name = Text.toJagexName(member.getName());
-            if (name.equals(localName))
+            String cleanName = Text.toJagexName(member.getName());
+            if (cleanName.equals(localName))
             {
                 continue;
             }
-            if (showWorld)
-            {
-                lines.add("&&WORLD&&" + name + "&&w" + member.getWorld());
-            }
-            else
-            {
-                lines.add(name);
-            }
+            int rankOrdinal = member.getRank().getValue();
+            String displayName = showRanks ? rankSymbol(rankOrdinal) + cleanName : cleanName;
+            lines.add(new PlayerLine(displayName, cleanName, showWorld ? member.getWorld() : -1, rankOrdinal));
         }
 
-        lines.sort(null);
+        sortLines(lines);
         return trimLines(lines);
     }
 
@@ -361,14 +361,40 @@ public class FriendsOnlinePlugin extends Plugin
             .orElse(null);
     }
 
-    private List<String> trimLines(List<String> lines)
+    private static String rankSymbol(int ordinal)
+    {
+        if (ordinal <= 0) return "";
+        int idx = Math.min(ordinal, RANK_SYMBOLS.length - 1);
+        return RANK_SYMBOLS[idx] + " ";
+    }
+
+    private void sortLines(List<PlayerLine> lines)
+    {
+        FriendsOnlineConfig.SortMode mode = config.sortMode();
+        Comparator<PlayerLine> c;
+
+        if (mode == FriendsOnlineConfig.SortMode.RANK)
+        {
+            c = Comparator.<PlayerLine, Integer>comparing(pl -> pl.moreLine ? 0 : -pl.rank)
+                .thenComparing(pl -> pl.moreLine ? "" : pl.sortName, String.CASE_INSENSITIVE_ORDER);
+        }
+        else
+        {
+            c = Comparator.<PlayerLine, Boolean>comparing(pl -> pl.moreLine)
+                .thenComparing(pl -> pl.sortName, String.CASE_INSENSITIVE_ORDER);
+        }
+
+        lines.sort(c);
+    }
+
+    private List<PlayerLine> trimLines(List<PlayerLine> lines)
     {
         int max = config.maxPlayers();
         if (max > 0 && lines.size() > max)
         {
             int remaining = lines.size() - max;
             lines = new ArrayList<>(lines.subList(0, max));
-            lines.add("+" + remaining + " more");
+            lines.add(new PlayerLine("+" + remaining + " more"));
         }
         return lines;
     }

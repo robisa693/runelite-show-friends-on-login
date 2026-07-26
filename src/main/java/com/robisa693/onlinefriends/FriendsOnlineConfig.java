@@ -13,7 +13,7 @@ public interface FriendsOnlineConfig extends Config
 
     @ConfigSection(
         name = "Display",
-        description = "Display settings for the infobox",
+        description = "Display settings for the overlay",
         position = 0
     )
     String displaySection = "display";
@@ -25,10 +25,17 @@ public interface FriendsOnlineConfig extends Config
     )
     String categoriesSection = "categories";
 
+    @ConfigSection(
+        name = "Appearance",
+        description = "Visual settings for the overlay",
+        position = 2
+    )
+    String appearanceSection = "appearance";
+
     @Range(min = 0, max = 120)
     @ConfigItem(
         keyName = "displayTime",
-        name = "Display Time",
+        name = "Display Time (seconds)",
         description = "How many seconds the overlay stays visible before hiding (0 = never hide)",
         section = displaySection,
         position = 0
@@ -97,5 +104,35 @@ public interface FriendsOnlineConfig extends Config
     default boolean showFriendsChat()
     {
         return true;
+    }
+
+    @ConfigItem(
+        keyName = "showRanks",
+        name = "Show Ranks",
+        description = "Show rank icons next to player names in clan chat and chat channel",
+        section = appearanceSection,
+        position = 0
+    )
+    default boolean showRanks()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "sortMode",
+        name = "Sort Mode",
+        description = "How to sort players within each category",
+        section = appearanceSection,
+        position = 1
+    )
+    default SortMode sortMode()
+    {
+        return SortMode.ALPHABETICAL;
+    }
+
+    enum SortMode
+    {
+        ALPHABETICAL,
+        RANK
     }
 }
