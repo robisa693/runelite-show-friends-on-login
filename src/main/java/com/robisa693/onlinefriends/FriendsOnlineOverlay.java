@@ -3,17 +3,26 @@ package com.robisa693.onlinefriends;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.util.List;
 import javax.inject.Inject;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 public class FriendsOnlineOverlay extends OverlayPanel
 {
+    private static final int COLUMN_GAP = 15;
+
     private FriendsOnlinePlugin plugin;
     private boolean visible;
+
+    private PanelComponent friendsPanel = new PanelComponent();
+    private PanelComponent clanPanel = new PanelComponent();
+    private PanelComponent chatPanel = new PanelComponent();
+    private boolean populated;
 
     @Inject
     public FriendsOnlineOverlay(FriendsOnlinePlugin plugin)
@@ -47,64 +56,71 @@ public class FriendsOnlineOverlay extends OverlayPanel
             return null;
         }
 
-        if (friendLines != null && !friendLines.isEmpty())
+        if (!populated)
         {
-            panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Friends (" + friendLines.size() + "):")
-                .build());
-            for (String line : friendLines)
+            populatePanel(friendsPanel, "Friends", friendLines);
+            populatePanel(clanPanel, "Clan Chat", clanLines);
+            populatePanel(chatPanel, channelName != null ? channelName : "Chat Channel", chatLines);
+            populated = true;
+
+            Graphics2D warmup = (Graphics2D) graphics.create();
+            warmup.setClip(0, 0, 0, 0);
+            for (PanelComponent p : new PanelComponent[]{friendsPanel, clanPanel, chatPanel})
             {
-                String[] parts = parseLine(line);
-                panelComponent.getChildren().add(LineComponent.builder()
-                    .left(parts[0])
-                    .right(parts[1])
-                    .rightColor(parts[1] != null ? Color.GREEN : null)
-                    .build());
+                if (!p.getChildren().isEmpty())
+                {
+                    p.setPreferredLocation(new Point(0, 0));
+                    p.render(warmup);
+                }
             }
+            warmup.dispose();
         }
 
-        if (clanLines != null && !clanLines.isEmpty())
+        PanelComponent[] panels = {friendsPanel, clanPanel, chatPanel};
+        int x = 0;
+        int totalHeight = 0;
+
+        for (PanelComponent panel : panels)
         {
-            if (!panelComponent.getChildren().isEmpty())
-            {
-                panelComponent.getChildren().add(TitleComponent.builder().text("").build());
-            }
-            panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Clan Chat (" + clanLines.size() + "):")
-                .build());
-            for (String line : clanLines)
-            {
-                String[] parts = parseLine(line);
-                panelComponent.getChildren().add(LineComponent.builder()
-                    .left(parts[0])
-                    .right(parts[1])
-                    .rightColor(parts[1] != null ? Color.GREEN : null)
-                    .build());
-            }
+            if (panel.getChildren().isEmpty()) continue;
+
+            panel.setPreferredLocation(new Point(x, 0));
+            Dimension dim = panel.render(graphics);
+
+            x += dim.width + COLUMN_GAP;
+            totalHeight = Math.max(totalHeight, dim.height);
         }
 
-        if (chatLines != null && !chatLines.isEmpty())
+        if (x == 0)
         {
-            if (!panelComponent.getChildren().isEmpty())
-            {
-                panelComponent.getChildren().add(TitleComponent.builder().text("").build());
-            }
-            String label = channelName != null ? channelName : "Chat Channel";
-            panelComponent.getChildren().add(TitleComponent.builder()
-                .text(label + " (" + chatLines.size() + "):")
-                .build());
-            for (String line : chatLines)
-            {
-                String[] parts = parseLine(line);
-                panelComponent.getChildren().add(LineComponent.builder()
-                    .left(parts[0])
-                    .right(parts[1])
-                    .rightColor(parts[1] != null ? Color.GREEN : null)
-                    .build());
-            }
+            return null;
         }
 
-        return super.render(graphics);
+        return new Dimension(x - COLUMN_GAP, totalHeight);
+    }
+
+    private static void populatePanel(PanelComponent panel, String title, List<String> lines)
+    {
+        panel.getChildren().clear();
+
+        if (lines == null || lines.isEmpty())
+        {
+            return;
+        }
+
+        panel.getChildren().add(TitleComponent.builder()
+            .text(title + " (" + lines.size() + "):")
+            .build());
+
+        for (String line : lines)
+        {
+            String[] parts = parseLine(line);
+            panel.getChildren().add(LineComponent.builder()
+                .left(parts[0])
+                .right(parts[1])
+                .rightColor(parts[1] != null ? Color.GREEN : null)
+                .build());
+        }
     }
 
     private static String[] parseLine(String line)
