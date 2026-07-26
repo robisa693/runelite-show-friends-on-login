@@ -13,6 +13,7 @@ import net.runelite.api.FriendsChatMember;
 import net.runelite.api.Player;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
+import net.runelite.api.events.ClanChannelChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.GameState;
@@ -103,6 +104,22 @@ public class FriendsOnlinePlugin extends Plugin
             overlay.setVisible(false);
             hideTicks = -1;
             shownOnce = false;
+        }
+    }
+
+    @Subscribe
+    public void onClanChannelChanged(ClanChannelChanged event)
+    {
+        if (event.getClanChannel() == null)
+        {
+            return;
+        }
+
+        clanLines = buildClanLines();
+
+        if (overlay.isVisible())
+        {
+            overlay.invalidateData();
         }
     }
 

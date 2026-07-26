@@ -45,6 +45,16 @@ public class FriendsOnlineOverlay extends OverlayPanel
         }
     }
 
+    public boolean isVisible()
+    {
+        return visible;
+    }
+
+    public void invalidateData()
+    {
+        populated = false;
+    }
+
     @Override
     public Dimension render(Graphics2D graphics)
     {
