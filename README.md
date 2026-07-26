@@ -1,5 +1,7 @@
 # Friends Online
 
+![Demo](docs/Recording%202026-07-26%20125910.gif)
+
 A RuneLite plugin that shows an overlay on login with online friends, clan chat members, and friends chat members, including their worlds.
 
 ## Features
